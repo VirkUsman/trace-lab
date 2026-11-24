@@ -1,0 +1,22 @@
+# Receives OTLP from the service and prints what it got. There is no trace
+# backend in this stack, so the collector's own log is where spans land.
+receivers:
+  otlp:
+    protocols:
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  batch:
+    timeout: 2s
+
+exporters:
+  debug:
+    verbosity: detailed
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [debug]
