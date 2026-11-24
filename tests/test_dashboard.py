@@ -10,6 +10,7 @@ DASHBOARD = ROOT / "grafana" / "dashboards" / "trace-lab.json"
 RULES = ROOT / "rules" / "slo.rules.yml"
 DATASOURCE = ROOT / "grafana" / "provisioning" / "datasources" / "prometheus.yml"
 
+
 @pytest.fixture(scope="module")
 def dash():
     return json.loads(DASHBOARD.read_text())
