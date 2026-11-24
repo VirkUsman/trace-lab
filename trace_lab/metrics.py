@@ -14,6 +14,13 @@ LATENCY_BUCKETS = (0.01, 0.025, 0.05, 0.1, 0.2, 0.3, 0.5, 1.0, 2.5, 5.0)
 
 UNMATCHED = "unmatched"
 
+KNOWN_METHODS = {"GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"}
+
+
+def method_label(method: str) -> str:
+    """HTTP allows any token as a method, so anything unusual becomes OTHER."""
+    return method if method in KNOWN_METHODS else "OTHER"
+
 
 def status_class(code: int) -> str:
     return f"{code // 100}xx"

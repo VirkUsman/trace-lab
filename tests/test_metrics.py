@@ -144,3 +144,13 @@ def test_scraping_metrics_does_not_count_itself(client, metrics):
     client.get("/metrics")
     client.get("/metrics")
     assert sample(metrics, REQ, method="GET", route="/metrics", status="2xx") is None
+
+
+def test_odd_http_methods_do_not_mint_series(client, metrics):
+    for verb in ("PURGE", "FOO", "BREW", "MKCOL"):
+        client.request(verb, "/orders/3")
+    client.get("/orders/3")
+    methods = {
+        s.labels["method"] for f in metrics.registry.collect() for s in f.samples if s.name == REQ
+    }
+    assert methods == {"GET", "OTHER"}

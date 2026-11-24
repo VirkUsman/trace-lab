@@ -17,7 +17,7 @@ from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.trace import SpanKind, Status, StatusCode
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 
-from trace_lab.metrics import UNMATCHED, Metrics, status_class
+from trace_lab.metrics import UNMATCHED, Metrics, method_label, status_class
 
 SKUS = ["sku-0", "sku-1", "sku-2"]
 STOCK = {"sku-0": 12, "sku-1": 0}  # sku-2 is deliberately unknown
@@ -64,8 +64,9 @@ def _instrument(
         if metrics:
             elapsed = time.perf_counter() - started
             metrics.inflight.dec()
-            metrics.requests.labels(request.method, route, status_class(code)).inc()
-            metrics.duration.labels(request.method, route).observe(elapsed)
+            method = method_label(request.method)
+            metrics.requests.labels(method, route, status_class(code)).inc()
+            metrics.duration.labels(method, route).observe(elapsed)
         return response
 
 
