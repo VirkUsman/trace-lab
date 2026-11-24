@@ -1,0 +1,179 @@
+# Recording and alerting rules for the two SLOs.
+#
+#   availability: 99.9 % of requests are not 5xx      (error budget 0.001)
+#   latency:      99 % of requests finish within 0.3 s (error budget 0.01)
+#
+# Burn rate is how many times faster than "exactly on budget" the budget is
+# being spent. Each alert needs a long window and a short window over the
+# threshold at once: the long one proves it is not a blip, the short one makes
+# the alert clear soon after the problem stops. Window pairs and factors are
+# the ones in the Google SRE Workbook, chapter 5, "Multiwindow, Multi-Burn-Rate
+# Alerts". The short window is always 1/12 of the long one.
+groups:
+  - name: trace_lab_slo_recording
+    interval: 30s
+    rules:
+      - record: trace_lab:http_error_ratio:rate5m
+        expr: |
+          sum(rate(trace_lab_http_requests_total{status="5xx"}[5m]))
+          /
+          sum(rate(trace_lab_http_requests_total[5m]))
+      - record: trace_lab:http_error_ratio:rate30m
+        expr: |
+          sum(rate(trace_lab_http_requests_total{status="5xx"}[30m]))
+          /
+          sum(rate(trace_lab_http_requests_total[30m]))
+      - record: trace_lab:http_error_ratio:rate1h
+        expr: |
+          sum(rate(trace_lab_http_requests_total{status="5xx"}[1h]))
+          /
+          sum(rate(trace_lab_http_requests_total[1h]))
+      - record: trace_lab:http_error_ratio:rate2h
+        expr: |
+          sum(rate(trace_lab_http_requests_total{status="5xx"}[2h]))
+          /
+          sum(rate(trace_lab_http_requests_total[2h]))
+      - record: trace_lab:http_error_ratio:rate6h
+        expr: |
+          sum(rate(trace_lab_http_requests_total{status="5xx"}[6h]))
+          /
+          sum(rate(trace_lab_http_requests_total[6h]))
+      - record: trace_lab:http_error_ratio:rate1d
+        expr: |
+          sum(rate(trace_lab_http_requests_total{status="5xx"}[1d]))
+          /
+          sum(rate(trace_lab_http_requests_total[1d]))
+      - record: trace_lab:http_error_ratio:rate3d
+        expr: |
+          sum(rate(trace_lab_http_requests_total{status="5xx"}[3d]))
+          /
+          sum(rate(trace_lab_http_requests_total[3d]))
+      - record: trace_lab:http_slow_ratio:rate5m
+        expr: |
+          1 - (
+            sum(rate(trace_lab_http_request_duration_seconds_bucket{le="0.3"}[5m]))
+            /
+            sum(rate(trace_lab_http_request_duration_seconds_count[5m]))
+          )
+      - record: trace_lab:http_slow_ratio:rate30m
+        expr: |
+          1 - (
+            sum(rate(trace_lab_http_request_duration_seconds_bucket{le="0.3"}[30m]))
+            /
+            sum(rate(trace_lab_http_request_duration_seconds_count[30m]))
+          )
+      - record: trace_lab:http_slow_ratio:rate1h
+        expr: |
+          1 - (
+            sum(rate(trace_lab_http_request_duration_seconds_bucket{le="0.3"}[1h]))
+            /
+            sum(rate(trace_lab_http_request_duration_seconds_count[1h]))
+          )
+      - record: trace_lab:http_slow_ratio:rate2h
+        expr: |
+          1 - (
+            sum(rate(trace_lab_http_request_duration_seconds_bucket{le="0.3"}[2h]))
+            /
+            sum(rate(trace_lab_http_request_duration_seconds_count[2h]))
+          )
+      - record: trace_lab:http_slow_ratio:rate6h
+        expr: |
+          1 - (
+            sum(rate(trace_lab_http_request_duration_seconds_bucket{le="0.3"}[6h]))
+            /
+            sum(rate(trace_lab_http_request_duration_seconds_count[6h]))
+          )
+      - record: trace_lab:http_slow_ratio:rate1d
+        expr: |
+          1 - (
+            sum(rate(trace_lab_http_request_duration_seconds_bucket{le="0.3"}[1d]))
+            /
+            sum(rate(trace_lab_http_request_duration_seconds_count[1d]))
+          )
+      - record: trace_lab:http_slow_ratio:rate3d
+        expr: |
+          1 - (
+            sum(rate(trace_lab_http_request_duration_seconds_bucket{le="0.3"}[3d]))
+            /
+            sum(rate(trace_lab_http_request_duration_seconds_count[3d]))
+          )
+
+  - name: trace_lab_slo_alerts
+    rules:
+      - alert: TraceLabAvailabilityBurnFast
+        expr: |
+          trace_lab:http_error_ratio:rate1h > (14.4 * 0.001)
+          and
+          trace_lab:http_error_ratio:rate5m > (14.4 * 0.001)
+        for: 2m
+        labels:
+          severity: page
+          slo: availability
+        annotations:
+          summary: "availability budget burning at 14.4x or more"
+          description: "5xx responses are over 14.4x the budget over both 1h and 5m."
+
+      - alert: TraceLabAvailabilityBurnSlow
+        expr: |
+          trace_lab:http_error_ratio:rate6h > (6 * 0.001)
+          and
+          trace_lab:http_error_ratio:rate30m > (6 * 0.001)
+        for: 15m
+        labels:
+          severity: page
+          slo: availability
+        annotations:
+          summary: "availability budget burning at 6x or more"
+          description: "5xx responses are over 6x the budget over both 6h and 30m."
+
+      - alert: TraceLabAvailabilityBurnTicket
+        expr: |
+          trace_lab:http_error_ratio:rate1d > (3 * 0.001)
+          and
+          trace_lab:http_error_ratio:rate2h > (3 * 0.001)
+        for: 1h
+        labels:
+          severity: ticket
+          slo: availability
+        annotations:
+          summary: "availability budget burning at 3x or more"
+          description: "5xx responses are over 3x the budget over both 1d and 2h."
+
+      - alert: TraceLabAvailabilityBurnDrift
+        expr: |
+          trace_lab:http_error_ratio:rate3d > (1 * 0.001)
+          and
+          trace_lab:http_error_ratio:rate6h > (1 * 0.001)
+        for: 3h
+        labels:
+          severity: ticket
+          slo: availability
+        annotations:
+          summary: "availability budget burning at 1x or more"
+          description: "5xx responses are over 1x the budget over both 3d and 6h."
+
+      - alert: TraceLabLatencyBurnFast
+        expr: |
+          trace_lab:http_slow_ratio:rate1h > (14.4 * 0.01)
+          and
+          trace_lab:http_slow_ratio:rate5m > (14.4 * 0.01)
+        for: 2m
+        labels:
+          severity: page
+          slo: latency
+        annotations:
+          summary: "latency budget burning at 14.4x or more"
+          description: "Responses slower than 0.3 s are over 14.4x the budget over both 1h and 5m."
+
+      - alert: TraceLabLatencyBurnSlow
+        expr: |
+          trace_lab:http_slow_ratio:rate6h > (6 * 0.01)
+          and
+          trace_lab:http_slow_ratio:rate30m > (6 * 0.01)
+        for: 15m
+        labels:
+          severity: page
+          slo: latency
+        annotations:
+          summary: "latency budget burning at 6x or more"
+          description: "Responses slower than 0.3 s are over 6x the budget over both 6h and 30m."
