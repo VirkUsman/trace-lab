@@ -1,0 +1,49 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-go@v5
+        with:
+          go-version: stable
+
+      - run: uv sync --frozen
+      - run: uv run ruff check .
+      - run: uv run ruff format --check .
+
+      # Builds promtool from source, which takes a few minutes the first time.
+      - name: Install promtool
+        run: |
+          go install github.com/prometheus/prometheus/cmd/promtool@v0.316.0
+          echo "PROMTOOL=$(go env GOPATH)/bin/promtool" >> "$GITHUB_ENV"
+
+      - run: uv run pytest
+      - run: $PROMTOOL check rules rules/slo.rules.yml
+      - run: $PROMTOOL test rules rules-tests/slo_test.yml
+
+      # A window typo in the fast alert must turn the rule tests red.
+      - name: The rule tests can fail
+        run: |
+          sed -i 's/rate5m > (14.4/rate1h > (14.4/' rules/slo.rules.yml
+          git diff --exit-code --quiet rules && { echo "the edit did not apply"; exit 1; }
+          if $PROMTOOL test rules rules-tests/slo_test.yml; then
+            echo "a wrong window passed, so the rule tests check nothing"
+            exit 1
+          fi
+          git checkout rules
+
+  compose:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker compose config --quiet
